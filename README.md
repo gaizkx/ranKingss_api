@@ -120,7 +120,7 @@ src/
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | `int` (PK, auto) | Clave primaria interna |
+| `id` | `ulid` (PK) | Clave primaria interna |
 | `accountNumber` | `string(12)` (unique) | Número anónimo de 12 dígitos (usado en el login) |
 | `password` | `string` | Contraseña hasheada (bcrypt) |
 | `createdAt` | `DateTimeImmutable` | Fecha de registro (UTC) |
@@ -129,7 +129,7 @@ src/
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | `int` (PK, auto) | Clave primaria |
+| `id` | `ulid` (PK) | Clave primaria |
 | `name` | `string(255)` | Nombre del empleado |
 | `createdAt` | `DateTimeImmutable` | Fecha de alta (UTC) |
 
@@ -137,7 +137,7 @@ src/
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `id` | `int` (PK, auto) | Clave primaria |
+| `id` | `ulid` (PK) | Clave primaria |
 | `user` | `ManyToOne(User)` | Usuario que emite la valoración |
 | `employee` | `ManyToOne(Employee)` | Empleado valorado |
 | `score` | `int` (0–10) | Puntuación |
@@ -147,7 +147,7 @@ src/
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `employeeId` | `int` | ID del empleado |
+| `employeeId` | `ulid` | ID del empleado |
 | `employeeName` | `string` | Nombre del empleado |
 | `totalScore` | `int` | Suma de todas las puntuaciones |
 | `rankingCount` | `int` | Número total de rankings |
@@ -209,13 +209,13 @@ src/
 // Response 200
 [
   {
-    "id": 1,
+    "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOP",
     "name": "Ana García",
     "totalRankings": 42,
     "averageScore": 7.8
   },
   {
-    "id": 2,
+    "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOQ",
     "name": "Carlos López",
     "totalRankings": 35,
     "averageScore": 6.5
@@ -247,8 +247,8 @@ src/
 // GET /api/rankings?startDate=2026-03-01
 [
   {
-    "id": 12,
-    "employee": { "id": 3, "name": "Carlos López" },
+    "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOP",
+    "employee": { "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOQ", "name": "Carlos López" },
     "score": 8,
     "createdAt": "2026-03-15T10:30:00+00:00"
   }
@@ -260,14 +260,14 @@ src/
 ```json
 // Request
 {
-  "employee": "/api/employees/3",
+  "employee": "/api/employees/01J9Z4X2Y5ABCDEFGHIJKLMNOQ",
   "score": 8
 }
 
 // Response 201
 {
-  "id": 12,
-  "employee": { "id": 3, "name": "Carlos López" },
+  "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOP",
+  "employee": { "id": "01J9Z4X2Y5ABCDEFGHIJKLMNOQ", "name": "Carlos López" },
   "score": 8,
   "createdAt": "2026-05-14T10:30:00+00:00"
 }
@@ -293,9 +293,9 @@ src/
 > El heatmap incluye **todos los días del rango**, incluso los que no tienen rankings (con `avgScore: 0.0` y `rankingCount: 0`).
 
 ```json
-// GET /api/employees/3/stats?startDate=2026-03-01&endDate=2026-03-05
+// GET /api/employees/01J9Z4X2Y5ABCDEFGHIJKLMNOQ/stats?startDate=2026-03-01&endDate=2026-03-05
 {
-  "employeeId": 3,
+  "employeeId": "01J9Z4X2Y5ABCDEFGHIJKLMNOQ",
   "employeeName": "Carlos López",
   "totalScore": 34,
   "rankingCount": 5,

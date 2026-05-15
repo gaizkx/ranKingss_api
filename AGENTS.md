@@ -59,8 +59,11 @@ Los usuarios se identifican con un número aleatorio de 12 dígitos y una contra
 )]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
-    #[ORM\Id, ORM\GeneratedValue, ORM\Column]
-    private ?int $id = null;
+    use Symfony\Component\Uid\Ulid;
+
+    #[ORM\Id]
+    #[ORM\Column(type: 'ulid', unique: true)]
+    private ?Ulid $id = null;
 
     #[ORM\Column(length: 12, unique: true)]
     private string $accountNumber; // 12 dígitos aleatorios
@@ -89,8 +92,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 )]
 class Employee
 {
-    #[ORM\Id, ORM\GeneratedValue, ORM\Column]
-    private ?int $id = null;
+    use Symfony\Component\Uid\Ulid;
+
+    #[ORM\Id]
+    #[ORM\Column(type: 'ulid', unique: true)]
+    private ?Ulid $id = null;
 
     #[ORM\Column(length: 255)]
     private string $name;
@@ -118,8 +124,11 @@ class Employee
 )]
 class Ranking
 {
-    #[ORM\Id, ORM\GeneratedValue, ORM\Column]
-    private ?int $id = null;
+    use Symfony\Component\Uid\Ulid;
+
+    #[ORM\Id]
+    #[ORM\Column(type: 'ulid', unique: true)]
+    private ?Ulid $id = null;
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
@@ -226,7 +235,7 @@ public function countTodayByUser(User $user): int;
 public function findByUserAndDateRange(User $user, DateTimeImmutable $from, DateTimeImmutable $to): array;
 
 // Estadísticas agregadas para EmployeeStatsProvider
-public function findStatsForEmployee(int $employeeId, DateTimeImmutable $from, DateTimeImmutable $to): array;
+public function findStatsForEmployee(Ulid $employeeId, DateTimeImmutable $from, DateTimeImmutable $to): array;
 // Retorna: ['totalScore' => int, 'rankingCount' => int, 'byDate' => [['date' => 'Y-m-d', 'avgScore' => float, 'count' => int]]]
 ```
 
@@ -369,4 +378,4 @@ ddev psql
 | Calcular fechas en timezone local | Usar siempre `new DateTimeZone('UTC')` explícitamente |
 | Generar el heatmap solo con días que tienen datos | Usar `DatePeriod` para iterar cada día del rango y rellenar con 0 los días sin datos |
 | No validar el rango de 3 meses en el Provider de stats | Validar también en `EmployeeStatsProvider`, no solo en el endpoint de rankings |
-| Usar `int` en lugar de `DateTimeImmutable` para `createdAt` | Doctrine mapea `DateTimeImmutable` directamente con `type: 'datetime_immutable'` |
+| Procesar fechas en PHP en vez de con funciones DQL custom | Mantener DQL estándar; el agrupado y formateo de fechas se hace con `DateTimeInterface::format()` en PHP |
