@@ -50,8 +50,8 @@ trait RepositoryTestCase
         $ranking->setScore($score);
         $ranking->setCreatedAt(
             $dateString !== null
-                ? new \DateTimeImmutable($dateString, new \DateTimeZone('UTC'))
-                : new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
+                ? new \DateTimeImmutable($dateString)
+                : new \DateTimeImmutable(),
         );
         $this->em()->persist($ranking);
         return $ranking;

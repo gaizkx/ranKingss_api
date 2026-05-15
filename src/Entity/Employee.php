@@ -27,7 +27,7 @@ class Employee
     public function __construct()
     {
         $this->__generateId();
-        $this->createdAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getName(): string

@@ -21,7 +21,7 @@ class RankingRepository extends ServiceEntityRepository
 
     public function countTodayByUser(User $user): int
     {
-        $start = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $start = new \DateTimeImmutable();
         $start = $start->setTime(0, 0, 0);
         $end = $start->modify('+1 day');
 

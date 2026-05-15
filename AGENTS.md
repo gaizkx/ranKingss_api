@@ -147,7 +147,7 @@ class Ranking
 }
 ```
 
-- `createdAt` se fija en `RankingCreateProcessor` como `new DateTimeImmutable('now', new DateTimeZone('UTC'))`. **No acepta valor del cliente.**
+- `createdAt` se fija en `RankingCreateProcessor` como `new DateTimeImmutable()`. **No acepta valor del cliente.**
 - `user` se fija en `RankingCreateProcessor` con el usuario autenticado. **No acepta valor del cliente.**
 
 ---
@@ -216,7 +216,7 @@ Lógica de `provide()`:
 1. Obtener el usuario autenticado via `Security::getUser()`.
 2. Contar rankings del usuario en el día natural UTC actual (consulta en `RankingRepository`).
 3. Si el conteo ≥ 5: lanzar `UnprocessableEntityHttpException('Límite diario de 5 rankings alcanzado.')`.
-4. Asignar `$ranking->setUser($user)` y `$ranking->setCreatedAt(new DateTimeImmutable('now', new DateTimeZone('UTC')))`.
+4. Asignar `$ranking->setUser($user)` y `$ranking->setCreatedAt(new DateTimeImmutable())`.
 5. Persistir y hacer flush.
 
 ---

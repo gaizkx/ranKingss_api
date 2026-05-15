@@ -95,7 +95,7 @@ class RankingRepositoryTest extends KernelTestCase
     {
         $user = $this->createUser();
         $employee = $this->createEmployee();
-        $yesterday = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 day');
+        $yesterday = (new \DateTimeImmutable())->modify('-1 day');
         $this->createRanking($user, $employee, 5, $yesterday->format('Y-m-d') . ' 10:00:00');
         $this->em()->flush();
 
@@ -140,8 +140,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 9, '2026-05-12 10:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-05-11 23:59:59', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-05-10 00:00:00');
+        $to = new \DateTimeImmutable('2026-05-11 23:59:59');
 
         $rankings = $this->rankingRepository->findByUserAndDateRange($user, $from, $to);
 
@@ -157,8 +157,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 5, '2026-05-10 10:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-06-01 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-06-30 23:59:59', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-06-01 00:00:00');
+        $to = new \DateTimeImmutable('2026-06-30 23:59:59');
 
         $rankings = $this->rankingRepository->findByUserAndDateRange($user, $from, $to);
 
@@ -170,8 +170,8 @@ class RankingRepositoryTest extends KernelTestCase
         $employee = $this->createEmployee('Alice');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-01-01 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-12-31 00:00:00', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-01-01 00:00:00');
+        $to = new \DateTimeImmutable('2026-12-31 00:00:00');
 
         $stats = $this->rankingRepository->findStatsForEmployee($employee->getId(), $from, $to);
 
@@ -189,8 +189,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 7, '2026-05-10 14:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-05-10 00:00:00');
+        $to = new \DateTimeImmutable('2026-05-10 00:00:00');
 
         $stats = $this->rankingRepository->findStatsForEmployee($employee->getId(), $from, $to);
 
@@ -213,8 +213,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 3, '2026-05-12 12:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-05-12 00:00:00', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-05-10 00:00:00');
+        $to = new \DateTimeImmutable('2026-05-12 00:00:00');
 
         $stats = $this->rankingRepository->findStatsForEmployee($employee->getId(), $from, $to);
 
@@ -246,8 +246,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 8, '2026-05-13 10:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-05-12 00:00:00', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-05-10 00:00:00');
+        $to = new \DateTimeImmutable('2026-05-12 00:00:00');
 
         $stats = $this->rankingRepository->findStatsForEmployee($employee->getId(), $from, $to);
 
@@ -267,8 +267,8 @@ class RankingRepositoryTest extends KernelTestCase
         $this->createRanking($user, $employee, 9, '2026-05-10 13:00:00');
         $this->em()->flush();
 
-        $from = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
-        $to = new \DateTimeImmutable('2026-05-10 00:00:00', new \DateTimeZone('UTC'));
+        $from = new \DateTimeImmutable('2026-05-10 00:00:00');
+        $to = new \DateTimeImmutable('2026-05-10 00:00:00');
 
         $stats = $this->rankingRepository->findStatsForEmployee($employee->getId(), $from, $to);
 
