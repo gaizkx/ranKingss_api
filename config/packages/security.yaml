@@ -20,7 +20,7 @@ security:
             provider: app_user_provider
             stateless: true
             json_login:
-                check_path: auth
+                check_path: /auth
                 username_path: account
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
@@ -40,6 +40,7 @@ security:
         - { path: ^/docs, roles: PUBLIC_ACCESS } # Allows accessing the Swagger UI docs
         - { path: ^/contexts, roles: PUBLIC_ACCESS } # Allows accessing the Swagger UI contexts
         - { path: ^/auth, roles: PUBLIC_ACCESS }
+        - { path: ^/register, roles: PUBLIC_ACCESS }
         - { path: ^/ping, roles: PUBLIC_ACCESS }
         - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
 

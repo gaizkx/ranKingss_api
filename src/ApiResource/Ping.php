@@ -29,7 +29,7 @@ use App\State\PingProvider;
                                     'type'       => 'object',
                                     'properties' => [
                                         'status'  => ['type' => 'string',  'example' => 'ok'],
-                                        'user_id' => ['type' => 'string',  'example' => '01KRNZ4AGSPGAB27PVRVW0PDM2', 'nullable' => true],
+                                        'user_id' => ['type' => 'string',  'example' => '123456123456', 'nullable' => true],
                                     ],
                                 ],
                             ],
