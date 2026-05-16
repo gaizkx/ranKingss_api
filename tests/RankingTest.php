@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
+use App\Entity\Ranking;
 use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\Employee;
@@ -47,7 +48,7 @@ class RankingTest extends ApiTestCase
 
     private function createRanking(User $user, Employee $employee, int $score): void
     {
-        $ranking = new \App\Entity\Ranking();
+        $ranking = new Ranking();
         $ranking->setUser($user);
         $ranking->setEmployee($employee);
         $ranking->setScore($score);
@@ -203,14 +204,14 @@ class RankingTest extends ApiTestCase
         $employee = $this->createEmployee('Date Filter Employee');
         self::getContainer()->get('doctrine')->getManager()->flush();
 
-        $ranking1 = new \App\Entity\Ranking();
+        $ranking1 = new Ranking();
         $ranking1->setUser($user);
         $ranking1->setEmployee($employee);
         $ranking1->setScore(5);
         $ranking1->setCreatedAt(new \DateTimeImmutable('-5 days'));
         self::getContainer()->get('doctrine')->getManager()->persist($ranking1);
 
-        $ranking2 = new \App\Entity\Ranking();
+        $ranking2 = new Ranking();
         $ranking2->setUser($user);
         $ranking2->setEmployee($employee);
         $ranking2->setScore(6);

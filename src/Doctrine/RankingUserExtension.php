@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Doctrine;
 
+use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryCollectionExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Extension\QueryItemExtensionInterface;
 use ApiPlatform\Doctrine\Orm\Util\QueryNameGeneratorInterface;
@@ -14,10 +15,10 @@ use Symfony\Bridge\Doctrine\Types\UlidType;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
-final class RankingUserExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
+final readonly class RankingUserExtension implements QueryCollectionExtensionInterface, QueryItemExtensionInterface
 {
     public function __construct(
-        private readonly Security $security,
+        private Security $security,
     ) {}
 
     public function applyToCollection(QueryBuilder $queryBuilder, QueryNameGeneratorInterface $queryNameGenerator, string $resourceClass, ?Operation $operation = null, array $context = []): void
@@ -43,7 +44,7 @@ final class RankingUserExtension implements QueryCollectionExtensionInterface, Q
     {
         $user = $this->security->getUser();
 
-        if ($user === null) {
+        if (!$user instanceof UserInterface) {
             return;
         }
 
@@ -52,12 +53,15 @@ final class RankingUserExtension implements QueryCollectionExtensionInterface, Q
         $queryBuilder->setParameter('current_user', $user->getId(), UlidType::NAME);
     }
 
+    /**
+     * @param array<string, mixed> $context
+     */
     private function applyDateFilters(QueryBuilder $queryBuilder, array $context): void
     {
         $filters = $context['filters'] ?? [];
 
-        $startDate = isset($filters['startDate']) ? $filters['startDate'] : null;
-        $endDate = isset($filters['endDate']) ? $filters['endDate'] : null;
+        $startDate = $filters['startDate'] ?? null;
+        $endDate = $filters['endDate'] ?? null;
 
         if ($startDate === null && $endDate === null) {
             return;
@@ -70,7 +74,7 @@ final class RankingUserExtension implements QueryCollectionExtensionInterface, Q
         try {
             $start = new \DateTimeImmutable($startDate);
             $end = new \DateTimeImmutable($endDate);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             throw new UnprocessableEntityHttpException('Formato de fecha inválido. Use Y-m-d.');
         }
 

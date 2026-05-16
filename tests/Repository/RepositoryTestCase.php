@@ -12,6 +12,7 @@ use Doctrine\ORM\EntityManagerInterface;
 trait RepositoryTestCase
 {
     private static int $accountCounter = 0;
+
     private ?EntityManagerInterface $entityManager = null;
 
     protected function setUpRepository(): void

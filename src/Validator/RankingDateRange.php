@@ -10,6 +10,7 @@ use Symfony\Component\Validator\Constraint;
 class RankingDateRange extends Constraint
 {
     public string $message = 'El rango de fechas no puede superar los 92 días.';
+
     public string $invalidDateMessage = 'Formato de fecha inválido. Use Y-m-d.';
 
     public function getTargets(): string

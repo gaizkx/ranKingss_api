@@ -26,12 +26,12 @@ class UserRepositoryTest extends KernelTestCase
     {
         $user = $this->createUser('123456789012');
         $this->em()->flush();
-        $id = $user->getId();
+        $ulid = $user->getId();
 
-        $this->assertInstanceOf(Ulid::class, $id);
+        $this->assertInstanceOf(Ulid::class, $ulid);
 
         $this->em()->clear();
-        $found = $this->userRepository->find($id);
+        $found = $this->userRepository->find($ulid);
 
         $this->assertNotNull($found);
         $this->assertSame('123456789012', $found->getAccountNumber());
@@ -57,10 +57,10 @@ class UserRepositoryTest extends KernelTestCase
         $this->createUser('111111111111');
         $this->em()->flush();
 
-        $duplicate = new User();
-        $duplicate->setAccountNumber('111111111111');
-        $duplicate->setPassword('irrelevant');
-        $this->em()->persist($duplicate);
+        $user = new User();
+        $user->setAccountNumber('111111111111');
+        $user->setPassword('irrelevant');
+        $this->em()->persist($user);
 
         $this->expectException(UniqueConstraintViolationException::class);
         $this->em()->flush();

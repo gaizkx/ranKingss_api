@@ -61,6 +61,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->createdAt;
     }
 
+    /**
+     * @return array<int, string>
+     */
     public function getRoles(): array
     {
         return ['ROLE_USER'];

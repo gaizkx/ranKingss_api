@@ -23,9 +23,10 @@ class RankingRepository extends ServiceEntityRepository
     {
         $start = new \DateTimeImmutable();
         $start = $start->setTime(0, 0, 0);
+
         $end = $start->modify('+1 day');
 
-        $qb = $this->createQueryBuilder('r')
+        $queryBuilder = $this->createQueryBuilder('r')
             ->select('COUNT(r.id)')
             ->where('r.user = :user')
             ->andWhere('r.createdAt >= :start')
@@ -34,7 +35,7 @@ class RankingRepository extends ServiceEntityRepository
             ->setParameter('start', $start)
             ->setParameter('end', $end);
 
-        return (int) $qb->getQuery()->getSingleScalarResult();
+        return (int) $queryBuilder->getQuery()->getSingleScalarResult();
     }
 
     /**
@@ -42,7 +43,7 @@ class RankingRepository extends ServiceEntityRepository
      */
     public function findByUserAndDateRange(User $user, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        $qb = $this->createQueryBuilder('r')
+        $queryBuilder = $this->createQueryBuilder('r')
             ->where('r.user = :user')
             ->andWhere('r.createdAt >= :from')
             ->andWhere('r.createdAt <= :to')
@@ -51,17 +52,20 @@ class RankingRepository extends ServiceEntityRepository
             ->setParameter('to', $to)
             ->orderBy('r.createdAt', 'DESC');
 
-        return $qb->getQuery()->getResult();
+        return $queryBuilder->getQuery()->getResult();
     }
 
-    public function findStatsForEmployee(Ulid $employeeId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    /**
+     * @return array<string, int|list<array<string, (float | int | string)>>>
+     */
+    public function findStatsForEmployee(Ulid $ulid, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $rows = $this->createQueryBuilder('r')
             ->select('r.score', 'r.createdAt')
             ->where('r.employee = :employeeId')
             ->andWhere('r.createdAt >= :from')
             ->andWhere('r.createdAt < :to')
-            ->setParameter('employeeId', $employeeId, UlidType::NAME)
+            ->setParameter('employeeId', $ulid, UlidType::NAME)
             ->setParameter('from', $from)
             ->setParameter('to', $to->modify('+1 day'))
             ->getQuery()

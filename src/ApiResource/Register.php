@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\ApiResource;
 
+use ApiPlatform\OpenApi\Model\Operation;
+use ApiPlatform\OpenApi\Model\Response;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Post;
-use ApiPlatform\OpenApi\Model;
 use App\State\RegisterProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 
@@ -16,12 +17,12 @@ use Symfony\Component\Validator\Constraints as Assert;
             uriTemplate: '/register',
             processor: RegisterProcessor::class,
             formats: ['json' => 'application/json'],
-            openapi: new Model\Operation(
+            openapi: new Operation(
                 summary: 'Register a new user',
                 description: 'Creates a new user with the given account number and password.',
                 tags: ['Auth'],
                 responses: [
-                    204 => new Model\Response(
+                    204 => new Response(
                         description: 'User created successfully',
                     ),
                 ],

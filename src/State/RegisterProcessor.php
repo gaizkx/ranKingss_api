@@ -12,11 +12,11 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
-final class RegisterProcessor implements ProcessorInterface
+final readonly class RegisterProcessor implements ProcessorInterface
 {
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly UserPasswordHasherInterface $passwordHasher,
+        private EntityManagerInterface $entityManager,
+        private UserPasswordHasherInterface $userPasswordHasher,
     ) {}
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): void
@@ -33,7 +33,7 @@ final class RegisterProcessor implements ProcessorInterface
 
         $user = new User();
         $user->setAccountNumber($data->accountNumber);
-        $user->setPassword($this->passwordHasher->hashPassword($user, $data->password));
+        $user->setPassword($this->userPasswordHasher->hashPassword($user, $data->password));
 
         $this->entityManager->persist($user);
         $this->entityManager->flush();

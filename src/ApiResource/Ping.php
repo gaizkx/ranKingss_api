@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\ApiResource;
 
+use ApiPlatform\OpenApi\Model\Operation;
+use ApiPlatform\OpenApi\Model\Response;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
-use ApiPlatform\OpenApi\Model;
 use App\State\PingProvider;
 
 #[ApiResource(
@@ -16,12 +17,12 @@ use App\State\PingProvider;
             provider: PingProvider::class,
             output: Ping::class,
             formats: ['json' => 'application/json'],
-            openapi: new Model\Operation(
+            openapi: new Operation(
                 summary: 'Health check',
                 description: 'Returns `ok`. If authenticated, also returns `user_id`.',
                 tags: ['Health'],
                 responses: [
-                    200 => new Model\Response(
+                    200 => new Response(
                         description: 'Ping response',
                         content: new \ArrayObject([
                             'application/json' => [
@@ -43,5 +44,6 @@ use App\State\PingProvider;
 class Ping
 {
     public string $status = 'ok';
+
     public ?string $user_id = null;
 }

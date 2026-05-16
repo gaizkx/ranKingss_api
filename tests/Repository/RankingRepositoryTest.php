@@ -27,12 +27,12 @@ class RankingRepositoryTest extends KernelTestCase
         $employee = $this->createEmployee();
         $ranking = $this->createRanking($user, $employee, 7);
         $this->em()->flush();
-        $id = $ranking->getId();
+        $ulid = $ranking->getId();
 
-        $this->assertInstanceOf(Ulid::class, $id);
+        $this->assertInstanceOf(Ulid::class, $ulid);
 
         $this->em()->clear();
-        $found = $this->rankingRepository->find($id);
+        $found = $this->rankingRepository->find($ulid);
 
         $this->assertNotNull($found);
         $this->assertSame(7, $found->getScore());
@@ -85,6 +85,7 @@ class RankingRepositoryTest extends KernelTestCase
         for ($i = 0; $i < 4; ++$i) {
             $this->createRanking($user, $employee, $i);
         }
+
         $this->em()->flush();
 
         $count = $this->rankingRepository->countTodayByUser($user);
@@ -124,6 +125,7 @@ class RankingRepositoryTest extends KernelTestCase
         for ($i = 0; $i < 5; ++$i) {
             $this->createRanking($user, $employee, $i);
         }
+
         $this->em()->flush();
 
         $count = $this->rankingRepository->countTodayByUser($user);

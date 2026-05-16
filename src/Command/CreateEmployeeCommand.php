@@ -42,9 +42,9 @@ class CreateEmployeeCommand extends Command
         if ($output->isQuiet()) {
             $output->writeln($ulid, OutputInterface::VERBOSITY_QUIET);
         } else {
-            $io = new SymfonyStyle($input, $output);
-            $io->success('Employee created successfully!');
-            $io->table(
+            $symfonyStyle = new SymfonyStyle($input, $output);
+            $symfonyStyle->success('Employee created successfully!');
+            $symfonyStyle->table(
                 ['Name', 'ID'],
                 [[$name, $ulid]],
             );

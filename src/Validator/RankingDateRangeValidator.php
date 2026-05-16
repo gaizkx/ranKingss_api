@@ -33,7 +33,7 @@ class RankingDateRangeValidator extends ConstraintValidator
         try {
             $start = new \DateTimeImmutable((string) $startDate);
             $end = new \DateTimeImmutable((string) $endDate);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $this->context->buildViolation($constraint->invalidDateMessage)->addViolation();
             return;
         }

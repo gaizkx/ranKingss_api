@@ -15,11 +15,11 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Uid\Ulid;
 
-final class EmployeeStatsProvider implements ProviderInterface
+final readonly class EmployeeStatsProvider implements ProviderInterface
 {
     public function __construct(
-        private readonly EntityManagerInterface $entityManager,
-        private readonly RankingRepository $rankingRepository,
+        private EntityManagerInterface $entityManager,
+        private RankingRepository $rankingRepository,
     ) {}
 
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): EmployeeStats
@@ -33,8 +33,8 @@ final class EmployeeStatsProvider implements ProviderInterface
         }
 
         $filters = $context['filters'] ?? [];
-        $startDate = isset($filters['startDate']) ? $filters['startDate'] : null;
-        $endDate = isset($filters['endDate']) ? $filters['endDate'] : null;
+        $startDate = $filters['startDate'] ?? null;
+        $endDate = $filters['endDate'] ?? null;
 
         if ($endDate === null) {
             $endDate = (new \DateTimeImmutable())->format('Y-m-d');
@@ -42,7 +42,7 @@ final class EmployeeStatsProvider implements ProviderInterface
 
         try {
             $end = new \DateTimeImmutable($endDate);
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             throw new UnprocessableEntityHttpException('Formato de fecha inválido. Use Y-m-d.');
         }
 
@@ -51,7 +51,7 @@ final class EmployeeStatsProvider implements ProviderInterface
         } else {
             try {
                 $start = new \DateTimeImmutable($startDate);
-            } catch (\Exception $e) {
+            } catch (\Exception) {
                 throw new UnprocessableEntityHttpException('Formato de fecha inválido. Use Y-m-d.');
             }
 
@@ -68,10 +68,10 @@ final class EmployeeStatsProvider implements ProviderInterface
             $byDate[$row['date']] = $row;
         }
 
-        $period = new \DatePeriod($start, new \DateInterval('P1D'), $end->modify('+1 day'));
+        $datePeriod = new \DatePeriod($start, new \DateInterval('P1D'), $end->modify('+1 day'));
         $heatmap = [];
 
-        foreach ($period as $date) {
+        foreach ($datePeriod as $date) {
             $key = $date->format('Y-m-d');
             if (isset($byDate[$key])) {
                 $heatmap[] = new HeatmapEntry(

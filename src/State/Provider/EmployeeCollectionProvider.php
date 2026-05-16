@@ -9,10 +9,10 @@ use ApiPlatform\State\ProviderInterface;
 use App\ApiResource\EmployeeListItem;
 use App\Repository\EmployeeRepository;
 
-final class EmployeeCollectionProvider implements ProviderInterface
+final readonly class EmployeeCollectionProvider implements ProviderInterface
 {
     public function __construct(
-        private readonly EmployeeRepository $employeeRepository,
+        private EmployeeRepository $employeeRepository,
     ) {}
 
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): array

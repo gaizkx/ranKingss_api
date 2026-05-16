@@ -12,12 +12,12 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 
-final class RankingCreateProcessor implements ProcessorInterface
+final readonly class RankingCreateProcessor implements ProcessorInterface
 {
     public function __construct(
-        private readonly Security $security,
-        private readonly RankingRepository $rankingRepository,
-        private readonly EntityManagerInterface $entityManager,
+        private Security $security,
+        private RankingRepository $rankingRepository,
+        private EntityManagerInterface $entityManager,
     ) {}
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): Ranking

@@ -19,12 +19,12 @@ class EmployeeRepository extends ServiceEntityRepository
 
     public function findAllWithStats(): array
     {
-        $qb = $this->createQueryBuilder('e')
+        $queryBuilder = $this->createQueryBuilder('e')
             ->select('e.id, e.name, COUNT(r.id) AS totalRankings, AVG(r.score) AS averageScore')
             ->leftJoin(Ranking::class, 'r', 'WITH', 'r.employee = e')
             ->groupBy('e.id', 'e.name')
             ->orderBy('e.name', 'ASC');
 
-        return $qb->getQuery()->getResult();
+        return $queryBuilder->getQuery()->getResult();
     }
 }

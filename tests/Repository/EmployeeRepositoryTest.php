@@ -25,12 +25,12 @@ class EmployeeRepositoryTest extends KernelTestCase
     {
         $employee = $this->createEmployee('Alice');
         $this->em()->flush();
-        $id = $employee->getId();
+        $ulid = $employee->getId();
 
-        $this->assertInstanceOf(Ulid::class, $id);
+        $this->assertInstanceOf(Ulid::class, $ulid);
 
         $this->em()->clear();
-        $found = $this->employeeRepository->find($id);
+        $found = $this->employeeRepository->find($ulid);
 
         $this->assertNotNull($found);
         $this->assertSame('Alice', $found->getName());
@@ -71,11 +71,11 @@ class EmployeeRepositoryTest extends KernelTestCase
     public function testFindAllWithStatsMultipleEmployees(): void
     {
         $user = $this->createUser();
-        $alice = $this->createEmployee('Alice');
+        $employee = $this->createEmployee('Alice');
         $bob = $this->createEmployee('Bob');
 
-        $this->createRanking($user, $alice, 10);
-        $this->createRanking($user, $alice, 6);
+        $this->createRanking($user, $employee, 10);
+        $this->createRanking($user, $employee, 6);
         $this->createRanking($user, $bob, 8);
         $this->em()->flush();
 
@@ -93,11 +93,11 @@ class EmployeeRepositoryTest extends KernelTestCase
     public function testFindAllWithStatsEmployeeWithoutRankings(): void
     {
         $user = $this->createUser();
-        $alice = $this->createEmployee('Alice');
+        $employee = $this->createEmployee('Alice');
         $bob = $this->createEmployee('Bob');
 
-        $this->createRanking($user, $alice, 8);
-        $this->createRanking($user, $alice, 6);
+        $this->createRanking($user, $employee, 8);
+        $this->createRanking($user, $employee, 6);
         $this->em()->flush();
 
         $stats = $this->employeeRepository->findAllWithStats();
