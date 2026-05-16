@@ -74,10 +74,7 @@ DATABASE_URL="postgresql://db:db@db:5432/db?serverVersion=16&charset=utf8"
 JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
 JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
 JWT_PASSPHRASE=change_me
-APP_TIMEZONE=UTC
 ```
-
-> ⚠️ Todas las operaciones de fecha/hora se realizan en **UTC**.
 
 ---
 
@@ -123,7 +120,7 @@ src/
 | `id` | `ulid` (PK) | Clave primaria interna |
 | `accountNumber` | `string(12)` (unique) | Número anónimo de 12 dígitos (usado en el login) |
 | `password` | `string` | Contraseña hasheada (bcrypt) |
-| `createdAt` | `DateTimeImmutable` | Fecha de registro (UTC) |
+| `createdAt` | `DateTimeImmutable` | Fecha de registro |
 
 ### `Employee`
 
@@ -131,7 +128,7 @@ src/
 |---|---|---|
 | `id` | `ulid` (PK) | Clave primaria |
 | `name` | `string(255)` | Nombre del empleado |
-| `createdAt` | `DateTimeImmutable` | Fecha de alta (UTC) |
+| `createdAt` | `DateTimeImmutable` | Fecha de alta |
 
 ### `Ranking`
 
@@ -141,7 +138,7 @@ src/
 | `user` | `ManyToOne(User)` | Usuario que emite la valoración |
 | `employee` | `ManyToOne(Employee)` | Empleado valorado |
 | `score` | `int` (0–10) | Puntuación |
-| `createdAt` | `DateTimeImmutable` | Fecha de creación (inmutable, UTC) |
+| `createdAt` | `DateTimeImmutable` | Fecha de creación (inmutable) |
 
 ### `EmployeeStats` *(recurso virtual, sin tabla DB)*
 
@@ -239,7 +236,7 @@ src/
 | Query param | Tipo | Requerido | Default | Descripción |
 |---|---|---|---|---|
 | `startDate` | `YYYY-MM-DD` | ✅ | — | Fecha inicio del rango |
-| `endDate` | `YYYY-MM-DD` | ❌ | Hoy (UTC) | Fecha fin del rango |
+| `endDate` | `YYYY-MM-DD` | ❌ | Hoy | Fecha fin del rango |
 
 > ⚠️ Entre `startDate` y `endDate` no pueden pasar más de **3 meses**. Si se supera, se devuelve `HTTP 422`.
 
@@ -273,7 +270,7 @@ src/
 }
 ```
 
-> ⚠️ Máximo **5 rankings por día natural (UTC)** por usuario. Si se supera, se devuelve `HTTP 422` con mensaje de error.  
+> ⚠️ Máximo **5 rankings por día natural** por usuario. Si se supera, se devuelve `HTTP 422` con mensaje de error.  
 > ✅ Se puede rankear al mismo empleado varias veces en el mismo día (dentro del límite).
 
 ---
@@ -287,7 +284,7 @@ src/
 | Query param | Tipo | Requerido | Default | Descripción |
 |---|---|---|---|---|
 | `startDate` | `YYYY-MM-DD` | ✅ | — | Fecha inicio del rango |
-| `endDate` | `YYYY-MM-DD` | ❌ | Hoy (UTC) | Fecha fin del rango |
+| `endDate` | `YYYY-MM-DD` | ❌ | Hoy | Fecha fin del rango |
 
 > ⚠️ Misma restricción de 3 meses que en rankings.  
 > El heatmap incluye **todos los días del rango**, incluso los que no tienen rankings (con `avgScore: 0.0` y `rankingCount: 0`).
@@ -316,7 +313,7 @@ src/
 
 1. **Anonimato total**: el número de cuenta de 12 dígitos se genera aleatoriamente. No hay mecanismo de recuperación de cuenta ni de contraseña.
 2. **Sin datos personales**: la API no almacena nombre, email ni ningún dato identificativo del usuario.
-3. **Límite diario de rankings**: máximo **5 rankings por usuario por día natural (UTC)**. El mismo empleado puede valorarse más de una vez dentro de ese límite.
+3. **Límite diario de rankings**: máximo **5 rankings por usuario por día natural**. El mismo empleado puede valorarse más de una vez dentro de ese límite.
 4. **Rankings inmutables**: una vez creado, un ranking no puede ser modificado ni eliminado.
 5. **Visibilidad restringida**: un usuario solo puede consultar **sus propios rankings** (filtrado automático por el usuario autenticado).
 6. **Gestión de empleados offline**: los empleados solo pueden crearse/modificarse mediante el comando de consola `app:employee:create`. No existe endpoint de escritura para empleados.

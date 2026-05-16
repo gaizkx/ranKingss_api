@@ -8,7 +8,7 @@ Guía para agentes de IA que trabajen en este proyecto. Lee este archivo complet
 
 API REST anónima para la valoración de empleados. Construida con **Symfony 7**, **API Platform 3** y **PHP 8.4** sobre **PostgreSQL 16**. El entorno local usa **ddev**.
 
-Los usuarios se identifican con un número aleatorio de 12 dígitos y una contraseña (sin datos personales). Cada usuario puede emitir hasta 5 rankings por día (UTC). Los rankings son inmutables.
+Los usuarios se identifican con un número de cuenta de 12 dígitos y una contraseña (sin datos personales). El número de cuenta lo proporciona el cliente en el registro. Cada usuario puede emitir hasta 5 rankings por día. Los rankings son inmutables.
 
 ---
 
@@ -25,14 +25,14 @@ Los usuarios se identifican con un número aleatorio de 12 dígitos y una contra
 ### Doctrine — Convenciones
 
 - Usar **PHP Attributes** para el mapeo ORM. **Nunca** XML ni YAML.
-- Todas las fechas se almacenan como `DateTimeImmutable` en UTC.
+- Todas las fechas se almacenan como `DateTimeImmutable`.
 - Claves foráneas con `nullable: false` salvo que se especifique lo contrario.
 - Los campos calculados (totalRankings, averageScore) **no son columnas**; se obtienen con DQL en el repositorio.
 
 ### Seguridad
 
 - Un único rol: `ROLE_USER`. Todos los usuarios autenticados tienen los mismos permisos.
-- Los endpoints de registro (`/api/register`) y login (`/api/auth`) son públicos.
+- Los endpoints de registro (`/register`) y login (`/auth`) son públicos.
 - El resto de endpoints **requieren JWT válido**.
 - El usuario autenticado se obtiene con `$this->security->getUser()` o inyectando `Security`.
 - El filtrado automático de rankings por usuario autenticado se implementa con una **Doctrine Extension** (`QueryCollectionExtensionInterface` + `QueryItemExtensionInterface`).
@@ -46,27 +46,14 @@ Los usuarios se identifican con un número aleatorio de 12 dígitos y una contra
 ```php
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
-#[ApiResource(
-    operations: [
-        new Post(
-            uriTemplate: '/register',
-            processor: UserRegistrationProcessor::class,
-            // sin JWT
-        ),
-    ],
-    normalizationContext: ['groups' => ['user:read']],
-    denormalizationContext: ['groups' => ['user:write']],
-)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
-    use Symfony\Component\Uid\Ulid;
-
-    #[ORM\Id]
-    #[ORM\Column(type: 'ulid', unique: true)]
-    private ?Ulid $id = null;
+    use UlidIdTrait {
+        __construct as private __generateId;
+    }
 
     #[ORM\Column(length: 12, unique: true)]
-    private string $accountNumber; // 12 dígitos aleatorios
+    private string $accountNumber;
 
     #[ORM\Column]
     private string $password;
@@ -77,7 +64,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 ```
 
 - `getUserIdentifier()` debe devolver `accountNumber` (no el email).
-- El `accountNumber` se genera en `UserRegistrationProcessor`, **no en la entidad**.
+- **No tiene** `#[ApiResource]`. El registro se maneja mediante un recurso virtual `Register` (ver sección `State Processors`).
+- `createdAt` se fija en el constructor de la entidad.
 
 ### `src/Entity/Employee.php`
 
@@ -92,11 +80,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 )]
 class Employee
 {
-    use Symfony\Component\Uid\Ulid;
-
-    #[ORM\Id]
-    #[ORM\Column(type: 'ulid', unique: true)]
-    private ?Ulid $id = null;
+    use UlidIdTrait {
+        __construct as private __generateId;
+    }
 
     #[ORM\Column(length: 255)]
     private string $name;
@@ -113,22 +99,11 @@ class Employee
 
 ```php
 #[ORM\Entity(repositoryClass: RankingRepository::class)]
-#[ApiResource(
-    operations: [
-        new GetCollection(), // GET /api/rankings
-        new Post(),          // POST /api/rankings
-    ],
-    normalizationContext: ['groups' => ['ranking:read']],
-    denormalizationContext: ['groups' => ['ranking:write']],
-    security: "is_granted('ROLE_USER')",
-)]
 class Ranking
 {
-    use Symfony\Component\Uid\Ulid;
-
-    #[ORM\Id]
-    #[ORM\Column(type: 'ulid', unique: true)]
-    private ?Ulid $id = null;
+    use UlidIdTrait {
+        __construct as private __generateId;
+    }
 
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
@@ -138,7 +113,6 @@ class Ranking
     #[ORM\JoinColumn(nullable: false)]
     private Employee $employee;
 
-    #[Assert\Range(min: 0, max: 10)]
     #[ORM\Column(type: 'smallint')]
     private int $score;
 
@@ -194,7 +168,7 @@ final class HeatmapEntry
 
 Lógica de `provide()`:
 1. Extraer `id` de `$uriVariables`.
-2. Leer `startDate` y `endDate` de `$context['filters']`. Si `endDate` es null → hoy UTC.
+2. Leer `startDate` y `endDate` de `$context['filters']`. Si `endDate` es null → hoy.
 3. Validar que el rango no supere 3 meses; si supera, lanzar `UnprocessableEntityHttpException`.
 4. Llamar a `RankingRepository::findStatsForEmployee($employeeId, $startDate, $endDate)`.
 5. Generar el heatmap iterando **cada día del rango** con `DatePeriod`.
@@ -204,17 +178,18 @@ Lógica de `provide()`:
 
 ## State Processors
 
-### `UserRegistrationProcessor`
+### `RegisterProcessor`
 
-1. Generar `accountNumber`: `str_pad(random_int(0, 999999999999), 12, '0', STR_PAD_LEFT)`.
-2. Hashear la contraseña con `UserPasswordHasherInterface`.
-3. Persistir con `EntityManagerInterface`.
-4. **Response**: `['accountNumber' => ..., 'message' => '...']` — NOT la entidad User.
+1. Recibir `accountNumber` (12 dígitos) y `password` del cuerpo de la petición vía `src/ApiResource/Register.php`.
+2. Buscar si el `accountNumber` ya existe; si existe, lanzar `ConflictHttpException`.
+3. Hashear la contraseña con `UserPasswordHasherInterface`.
+4. Persistir con `EntityManagerInterface`.
+5. **Response**: `204 No Content` — no devuelve la entidad User.
 
 ### `RankingCreateProcessor`
 
 1. Obtener el usuario autenticado via `Security::getUser()`.
-2. Contar rankings del usuario en el día natural UTC actual (consulta en `RankingRepository`).
+2. Contar rankings del usuario en el día natura actual (consulta en `RankingRepository`).
 3. Si el conteo ≥ 5: lanzar `UnprocessableEntityHttpException('Límite diario de 5 rankings alcanzado.')`.
 4. Asignar `$ranking->setUser($user)` y `$ranking->setCreatedAt(new DateTimeImmutable())`.
 5. Persistir y hacer flush.
@@ -228,7 +203,7 @@ Lógica de `provide()`:
 Métodos requeridos:
 
 ```php
-// Cuenta rankings del usuario en el día natural UTC
+// Cuenta rankings del usuario en el día natural
 public function countTodayByUser(User $user): int;
 
 // Rankigs del usuario con filtro de fechas (para GET /api/rankings)
@@ -288,41 +263,40 @@ php bin/console app:employee:create "Nombre del Empleado"
 
 ```yaml
 security:
-  password_hashers:
-    App\Entity\User: bcrypt
+    password_hashers:
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
 
-  providers:
-    app_user_provider:
-      entity:
-        class: App\Entity\User
-        property: accountNumber    # login por número de cuenta
+    providers:
+        app_user_provider:
+            entity:
+                class: App\Entity\User
+                property: accountNumber
 
-  firewalls:
-    login:
-      pattern: ^/api/auth
-      stateless: true
-      json_login:
-        check_path: /api/auth
-        username_path: account_number
-        password_path: password
-        success_handler: lexik_jwt_authentication.handler.authentication_success
-        failure_handler: lexik_jwt_authentication.handler.authentication_failure
+    firewalls:
+        dev:
+            pattern: ^/(_profiler|_wdt|assets|build)/
+            security: false
+        main:
+            lazy: true
+            provider: app_user_provider
+            stateless: true
+            json_login:
+                check_path: /auth
+                username_path: account
+                password_path: password
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            custom_authenticators:
+                - App\Security\OptionalJWTAuthenticator
 
-    register:
-      pattern: ^/api/register
-      stateless: true
-      security: false
-
-    api:
-      pattern: ^/api
-      stateless: true
-      jwt: ~
-
-  access_control:
-    - { path: ^/api/register, roles: PUBLIC_ACCESS }
-    - { path: ^/api/auth,     roles: PUBLIC_ACCESS }
-    - { path: ^/api/docs,     roles: PUBLIC_ACCESS }
-    - { path: ^/api,          roles: ROLE_USER }
+    access_control:
+        - { path: ^/$, roles: PUBLIC_ACCESS }
+        - { path: ^/docs, roles: PUBLIC_ACCESS }
+        - { path: ^/contexts, roles: PUBLIC_ACCESS }
+        - { path: ^/auth, roles: PUBLIC_ACCESS }
+        - { path: ^/register, roles: PUBLIC_ACCESS }
+        - { path: ^/ping, roles: PUBLIC_ACCESS }
+        - { path: ^/, roles: IS_AUTHENTICATED_FULLY }
 ```
 
 ---
@@ -371,11 +345,11 @@ ddev psql
 ## Errores comunes a evitar
 
 | Error | Solución |
-|---|---|
+|---|---|---|
 | Exponer `user` o `password` en la respuesta | Usar grupos de serialización; no incluir esos campos en `ranking:read` ni `user:read` |
 | Aceptar `user` o `createdAt` del cliente en POST /rankings | Ignorar esos campos en el DTO/denormalization y asignarlos siempre en el Processor |
 | Olvidar el filtrado automático por usuario en rankings | La `RankingUserExtension` debe actuar en **colección e ítem** |
-| Calcular fechas en timezone local | Usar siempre `new DateTimeZone('UTC')` explícitamente |
 | Generar el heatmap solo con días que tienen datos | Usar `DatePeriod` para iterar cada día del rango y rellenar con 0 los días sin datos |
 | No validar el rango de 3 meses en el Provider de stats | Validar también en `EmployeeStatsProvider`, no solo en el endpoint de rankings |
 | Procesar fechas en PHP en vez de con funciones DQL custom | Mantener DQL estándar; el agrupado y formateo de fechas se hace con `DateTimeInterface::format()` en PHP |
+| Olvidar que el login usa `/auth` (no `/api/auth`) | El endpoint de login es `POST /auth` con `account` y `password` en el body JSON |
