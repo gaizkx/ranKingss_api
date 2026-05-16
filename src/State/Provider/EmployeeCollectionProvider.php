@@ -15,12 +15,15 @@ final readonly class EmployeeCollectionProvider implements ProviderInterface
         private EmployeeRepository $employeeRepository,
     ) {}
 
+    /**
+     * @return EmployeeListItem[]
+     */
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): array
     {
         $rows = $this->employeeRepository->findAllWithStats();
 
         return array_map(
-            fn (array $row) => new EmployeeListItem(
+            fn (array $row): EmployeeListItem => new EmployeeListItem(
                 id: $row['id'],
                 name: $row['name'],
                 totalRankings: (int) $row['totalRankings'],

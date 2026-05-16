@@ -46,9 +46,9 @@ return RectorConfig::configure()
     )
 
     // ── Niveles graduales ─────────────────────────────────────────────────
-    ->withTypeCoverageLevel(0)   // cobertura de tipos: propiedades, retornos, params
-    ->withDeadCodeLevel(0)       // eliminación de código muerto
-    ->withCodeQualityLevel(0)    // calidad general del código
+    ->withTypeCoverageLevel(10)   // cobertura de tipos: propiedades, retornos, params
+    ->withDeadCodeLevel(10)       // eliminación de código muerto
+    ->withCodeQualityLevel(10)    // calidad general del código
 
     // ── Imports ───────────────────────────────────────────────────────────
     // Añade `use` statements automáticamente y elimina los no usados
