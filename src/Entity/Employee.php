@@ -4,10 +4,24 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\GetCollection;
+use App\ApiResource\EmployeeListItem;
 use App\Repository\EmployeeRepository;
+use App\State\Provider\EmployeeCollectionProvider;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: EmployeeRepository::class)]
+#[ApiResource(
+    operations: [
+        new GetCollection(
+            provider: EmployeeCollectionProvider::class,
+            output: EmployeeListItem::class,
+        ),
+    ],
+    paginationEnabled: false,
+    security: "is_granted('ROLE_USER')",
+)]
 class Employee
 {
     use UlidIdTrait {
@@ -19,10 +33,6 @@ class Employee
 
     #[ORM\Column]
     private \DateTimeImmutable $createdAt;
-
-    private ?int $totalRankings = null;
-
-    private ?float $averageScore = null;
 
     public function __construct()
     {
@@ -45,29 +55,5 @@ class Employee
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
-    }
-
-    public function getTotalRankings(): ?int
-    {
-        return $this->totalRankings;
-    }
-
-    public function setTotalRankings(?int $totalRankings): self
-    {
-        $this->totalRankings = $totalRankings;
-
-        return $this;
-    }
-
-    public function getAverageScore(): ?float
-    {
-        return $this->averageScore;
-    }
-
-    public function setAverageScore(?float $averageScore): self
-    {
-        $this->averageScore = $averageScore;
-
-        return $this;
     }
 }
