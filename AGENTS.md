@@ -6,7 +6,7 @@ Guía para agentes de IA que trabajen en este proyecto. Lee este archivo complet
 
 ## Contexto del proyecto
 
-API REST anónima para la valoración de empleados. Construida con **Symfony 7**, **API Platform 3** y **PHP 8.4** sobre **PostgreSQL 16**. El entorno local usa **ddev**.
+API REST anónima para la valoración de empleados. Construida con **Symfony 7.4**, **API Platform 4** y **PHP 8.4** sobre **PostgreSQL 18**. El entorno local usa **ddev**.
 
 Los usuarios se identifican con un número de cuenta de 12 dígitos y una contraseña (sin datos personales). El número de cuenta lo proporciona el cliente en el registro. Cada usuario puede emitir hasta 5 rankings por día. Los rankings son inmutables.
 
@@ -14,7 +14,7 @@ Los usuarios se identifican con un número de cuenta de 12 dígitos y una contra
 
 ## Arquitectura y patrones
 
-### API Platform 3 — Patrones obligatorios
+### API Platform 4 — Patrones obligatorios
 
 - Usar **PHP Attributes** para todas las configuraciones de API Platform. **Nunca** YAML ni XML.
 - Las operaciones se declaran con `#[ApiResource]` en la clase de la entidad o del recurso virtual.
@@ -73,9 +73,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 #[ORM\Entity(repositoryClass: EmployeeRepository::class)]
 #[ApiResource(
     operations: [
-        new GetCollection(), // GET /api/employees
+        new GetCollection(
+            provider: EmployeeCollectionProvider::class,
+            output: EmployeeListItem::class,
+        ),
+        new Get(
+            uriTemplate: '/employees/{id}/stats',
+            provider: EmployeeStatsProvider::class,
+            output: EmployeeStats::class,
+        ),
+        new Get(
+            normalizationContext: ['groups' => ['employee:read']],
+        ),
     ],
-    normalizationContext: ['groups' => ['employee:read']],
+    paginationEnabled: false,
     security: "is_granted('ROLE_USER')",
 )]
 class Employee
@@ -93,7 +104,8 @@ class Employee
 ```
 
 - **No hay** operación `Post`, `Put`, `Patch` ni `Delete` en esta entidad.
-- Los campos `totalRankings` y `averageScore` se añaden como propiedades no mapeadas, populadas desde el repositorio.
+- La colección (`GET /employees`) usa `EmployeeCollectionProvider` y devuelve una lista de `EmployeeListItem` con `totalRankings` y `averageScore`.
+- El endpoint `/employees/{id}/stats` es un recurso virtual con `EmployeeStatsProvider`.
 
 ### `src/Entity/Ranking.php`
 
@@ -126,7 +138,7 @@ class Ranking
 
 ---
 
-## Recurso virtual: `EmployeeStats`
+## Recursos de API
 
 ### `src/ApiResource/EmployeeStats.php`
 
@@ -140,21 +152,77 @@ class Ranking
 class EmployeeStats
 {
     public function __construct(
-        public readonly int    $employeeId,
-        public readonly string $employeeName,
-        public readonly int    $totalScore,
-        public readonly int    $rankingCount,
-        public readonly float  $averageScore,
+        public readonly string   $id,
+        public readonly string   $name,
+        public readonly int      $totalScore,
+        public readonly int      $rankingCount,
+        public readonly float    $averageScore,
         /** @var HeatmapEntry[] */
-        public readonly array  $heatmap,
+        public readonly array    $heatmap,
     ) {}
+}
+```
+
+### `src/ApiResource/EmployeeListItem.php`
+
+```php
+final readonly class EmployeeListItem
+{
+    public function __construct(
+        public Ulid  $id,
+        public string $name,
+        public int    $totalRankings,
+        public float  $averageScore,
+    ) {}
+}
+```
+
+### `src/ApiResource/Register.php`
+
+```php
+#[ApiResource(
+    operations: [
+        new Post(
+            uriTemplate: '/register',
+            processor: RegisterProcessor::class,
+            output: false,
+        ),
+    ],
+)]
+class Register
+{
+    #[Assert\NotBlank]
+    #[Assert\Length(exactly: 12)]
+    public string $accountNumber;
+
+    #[Assert\NotBlank]
+    #[Assert\Length(min: 6)]
+    public string $password;
+}
+```
+
+### `src/ApiResource/Ping.php`
+
+```php
+#[ApiResource(
+    operations: [
+        new Get(
+            uriTemplate: '/ping',
+            provider: PingProvider::class,
+        ),
+    ],
+)]
+class Ping
+{
+    public string $status = 'ok';
+    public ?string $user_id = null;
 }
 ```
 
 ### `src/DataTransferObject/HeatmapEntry.php`
 
 ```php
-final class HeatmapEntry
+final readonly class HeatmapEntry
 {
     public function __construct(
         public readonly string $date,        // formato Y-m-d
@@ -168,11 +236,12 @@ final class HeatmapEntry
 
 Lógica de `provide()`:
 1. Extraer `id` de `$uriVariables`.
-2. Leer `startDate` y `endDate` de `$context['filters']`. Si `endDate` es null → hoy.
-3. Validar que el rango no supere 3 meses; si supera, lanzar `UnprocessableEntityHttpException`.
-4. Llamar a `RankingRepository::findStatsForEmployee($employeeId, $startDate, $endDate)`.
-5. Generar el heatmap iterando **cada día del rango** con `DatePeriod`.
-6. Retornar instancia de `EmployeeStats`.
+2. Leer `startDate` y `endDate` de `$context['filters']`. Si `endDate` es null → hoy. Si `startDate` es null → hace 92 días.
+3. Validar que el rango no supere 92 días; si supera, lanzar `UnprocessableEntityHttpException`.
+4. Validar que el empleado exista; si no, lanzar `NotFoundHttpException`.
+5. Llamar a `RankingRepository::findStatsForEmployee($employeeId, $startDate, $endDate)`.
+6. Generar el heatmap iterando **cada día del rango** con `DatePeriod`, rellenando con 0 los días sin datos.
+7. Retornar instancia de `EmployeeStats`.
 
 ---
 
@@ -189,7 +258,7 @@ Lógica de `provide()`:
 ### `RankingCreateProcessor`
 
 1. Obtener el usuario autenticado via `Security::getUser()`.
-2. Contar rankings del usuario en el día natura actual (consulta en `RankingRepository`).
+2. Contar rankings del usuario en el día natural actual (consulta en `RankingRepository`).
 3. Si el conteo ≥ 5: lanzar `UnprocessableEntityHttpException('Límite diario de 5 rankings alcanzado.')`.
 4. Asignar `$ranking->setUser($user)` y `$ranking->setCreatedAt(new DateTimeImmutable())`.
 5. Persistir y hacer flush.
@@ -206,7 +275,7 @@ Métodos requeridos:
 // Cuenta rankings del usuario en el día natural
 public function countTodayByUser(User $user): int;
 
-// Rankigs del usuario con filtro de fechas (para GET /api/rankings)
+// Rankings del usuario con filtro de fechas (para GET /rankings)
 public function findByUserAndDateRange(User $user, DateTimeImmutable $from, DateTimeImmutable $to): array;
 
 // Estadísticas agregadas para EmployeeStatsProvider
@@ -229,19 +298,21 @@ public function findAllWithStats(): array;
 
 ## Filtrado automático de Rankings por usuario
 
-Crear `src/Doctrine/RankingUserExtension.php` implementando:
+`src/Doctrine/RankingUserExtension.php` implementando:
 - `QueryCollectionExtensionInterface`
 - `QueryItemExtensionInterface`
 
 Lógica: si la clase raíz del query es `Ranking` y hay usuario autenticado, añadir `AND o.user = :current_user`.
 
+Además aplica filtros de fecha (`startDate`, `endDate`) desde `$context['filters']` y valida el rango máximo de 92 días.
+
 ---
 
 ## Validación del rango de fechas
 
-Crear un constraint reutilizable `#[RankingDateRange]` que se aplica como validación en los filtros de los endpoints `GET /api/rankings` y `GET /api/employees/{id}/stats`.
-
+Constraint `#[RankingDateRange]` en `src/Validator/RankingDateRange.php`.
 Regla: `endDate - startDate <= 92 days` (3 meses aprox).
+Aunque la validación también se realiza directamente en `RankingUserExtension` y `EmployeeStatsProvider`.
 
 ---
 
@@ -250,7 +321,7 @@ Regla: `endDate - startDate <= 92 days` (3 meses aprox).
 ### `src/Command/CreateEmployeeCommand.php`
 
 ```
-php bin/console app:employee:create "Nombre del Empleado"
+ddev console app:employee:create "Nombre del Empleado"
 ```
 
 - Argumento: `name` (requerido).
@@ -321,20 +392,26 @@ ddev start
 # Instalar dependencias
 ddev composer install
 
+# Consola de Symfony
+ddev console <command>
+
 # Generar migración tras cambios en entidades
-ddev exec bin/console doctrine:migrations:diff
+ddev console doctrine:migrations:diff
 
 # Aplicar migraciones
-ddev exec bin/console doctrine:migrations:migrate
+ddev console doctrine:migrations:migrate
 
 # Regenerar claves JWT
-ddev exec bin/console lexik:jwt:generate-keypair --overwrite
+ddev console lexik:jwt:generate-keypair --overwrite
 
 # Crear empleado
-ddev exec bin/console app:employee:create "Ana García"
+ddev console app:employee:create "Ana García"
 
 # Tests
-ddev exec bin/phpunit
+ddev test
+
+# Rector (PHP CS)
+ddev rector
 
 # Consola PostgreSQL
 ddev psql
@@ -342,14 +419,39 @@ ddev psql
 
 ---
 
+## Tests
+
+### Preparar la base de datos de test
+
+```bash
+# Asegurar que existe y está migrada
+ddev console doctrine:database:create --env=test
+ddev console doctrine:migrations:migrate -n --env=test
+```
+
+### Ejecutar tests
+
+```bash
+ddev test
+```
+
+Con filtro:
+
+```bash
+ddev test --filter=RegisterTest
+```
+
+---
+
 ## Errores comunes a evitar
 
 | Error | Solución |
-|---|---|---|
+|---|---|
 | Exponer `user` o `password` en la respuesta | Usar grupos de serialización; no incluir esos campos en `ranking:read` ni `user:read` |
 | Aceptar `user` o `createdAt` del cliente en POST /rankings | Ignorar esos campos en el DTO/denormalization y asignarlos siempre en el Processor |
 | Olvidar el filtrado automático por usuario en rankings | La `RankingUserExtension` debe actuar en **colección e ítem** |
 | Generar el heatmap solo con días que tienen datos | Usar `DatePeriod` para iterar cada día del rango y rellenar con 0 los días sin datos |
-| No validar el rango de 3 meses en el Provider de stats | Validar también en `EmployeeStatsProvider`, no solo en el endpoint de rankings |
-| Procesar fechas en PHP en vez de con funciones DQL custom | Mantener DQL estándar; el agrupado y formateo de fechas se hace con `DateTimeInterface::format()` en PHP |
+| No validar el rango de 3 meses en el Provider de stats | Validar también en `EmployeeStatsProvider`, no solo en `RankingUserExtension` |
 | Olvidar que el login usa `/auth` (no `/api/auth`) | El endpoint de login es `POST /auth` con `account` y `password` en el body JSON |
+| Tener la base de datos de test sin migrar | Ejecutar `ddev console doctrine:database:create --env=test` y `ddev console doctrine:migrations:migrate -n --env=test` |
+| Usar `ddev exec bin/console` en vez del alias | Usar `ddev console <command>` |
