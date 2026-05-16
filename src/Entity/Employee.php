@@ -7,6 +7,7 @@ namespace App\Entity;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use Symfony\Component\Serializer\Annotation\Groups;
 use App\ApiResource\EmployeeListItem;
 use App\ApiResource\EmployeeStats;
 use App\Repository\EmployeeRepository;
@@ -26,6 +27,9 @@ use Doctrine\ORM\Mapping as ORM;
             provider: EmployeeStatsProvider::class,
             output: EmployeeStats::class,
         ),
+        new Get(
+            normalizationContext: ['groups' => ['employee:read']],
+        ),
     ],
     paginationEnabled: false,
     security: "is_granted('ROLE_USER')",
@@ -37,6 +41,7 @@ class Employee
     }
 
     #[ORM\Column(length: 255)]
+    #[Groups(['employee:read'])]
     private string $name;
 
     #[ORM\Column]
