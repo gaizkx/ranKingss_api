@@ -60,7 +60,7 @@ class RankingTest extends ApiTestCase
         $employee = $this->createEmployee('Test Employee');
         self::getContainer()->get('doctrine')->getManager()->flush();
 
-        $employeeIri = '/employees/' . $employee->getId()->toRfc4122();
+        $employeeIri = '/employees/' . $employee->getId();
 
         self::createClient()->request('POST', '/rankings', [
             'headers' => ['Content-Type' => 'application/ld+json'],
@@ -86,7 +86,7 @@ class RankingTest extends ApiTestCase
             'auth_bearer' => $token,
             'headers' => ['Content-Type' => 'application/ld+json', 'Accept' => 'application/ld+json'],
             'json' => [
-                'employee' => '/employees/' . $employee->getId()->toRfc4122(),
+                'employee' => '/employees/' . $employee->getId(),
                 'score' => 8,
             ],
         ]);
@@ -109,7 +109,7 @@ class RankingTest extends ApiTestCase
         self::getContainer()->get('doctrine')->getManager()->flush();
 
         $token = $this->getToken($user, $client);
-        $employeeIri = '/employees/' . $employee->getId()->toRfc4122();
+        $employeeIri = '/employees/' . $employee->getId();
         $body = ['json' => ['employee' => $employeeIri, 'score' => 5], 'headers' => ['Content-Type' => 'application/ld+json']];
 
         for ($i = 0; $i < 5; $i++) {
@@ -135,7 +135,7 @@ class RankingTest extends ApiTestCase
             'auth_bearer' => $token,
             'headers' => ['Content-Type' => 'application/ld+json'],
             'json' => [
-                'employee' => '/employees/' . $employee->getId()->toRfc4122(),
+                'employee' => '/employees/' . $employee->getId(),
                 'score' => -1,
             ],
         ]);
@@ -157,7 +157,7 @@ class RankingTest extends ApiTestCase
             'auth_bearer' => $token,
             'headers' => ['Content-Type' => 'application/ld+json'],
             'json' => [
-                'employee' => '/employees/' . $employee->getId()->toRfc4122(),
+                'employee' => '/employees/' . $employee->getId(),
                 'score' => 11,
             ],
         ]);

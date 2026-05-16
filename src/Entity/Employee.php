@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use App\ApiResource\EmployeeListItem;
+use App\ApiResource\EmployeeStats;
 use App\Repository\EmployeeRepository;
 use App\State\Provider\EmployeeCollectionProvider;
+use App\State\Provider\EmployeeStatsProvider;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: EmployeeRepository::class)]
@@ -17,6 +20,11 @@ use Doctrine\ORM\Mapping as ORM;
         new GetCollection(
             provider: EmployeeCollectionProvider::class,
             output: EmployeeListItem::class,
+        ),
+        new Get(
+            uriTemplate: '/employees/{id}/stats',
+            provider: EmployeeStatsProvider::class,
+            output: EmployeeStats::class,
         ),
     ],
     paginationEnabled: false,
