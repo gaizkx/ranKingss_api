@@ -13,6 +13,10 @@ API REST anónima para la valoración de empleados, construida con Symfony y API
 | Autenticación | JWT (`lexik/jwt-authentication-bundle`) |
 | Entorno local | ddev |
 
+## Documentación
+
+- [Despliegue con Docker (producción)](docs/deploy.md)
+
 ## Filosofía de diseño
 
 Los usuarios se registran con un número de cuenta de 12 dígitos (proporcionado por el cliente) y una contraseña. No se almacena ningún dato personal.
