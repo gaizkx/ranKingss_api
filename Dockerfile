@@ -1,181 +1,118 @@
 #syntax=docker/dockerfile:1
 
-# Versions
-FROM dunglas/frankenphp:1-php8.5 AS frankenphp_upstream
-
-# The different stages of this Dockerfile are meant to be built into separate images
-# https://docs.docker.com/build/building/multi-stage/#stop-at-a-specific-build-stage
-# https://docs.docker.com/reference/compose-file/build/#target
-
-
-# Base FrankenPHP image
-FROM frankenphp_upstream AS frankenphp_base
-
-SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
+# ─── Stage 1: Composer dependencies ──────────────────────────────────────────
+FROM composer:2.8 AS vendor
 
 WORKDIR /app
 
-# persistent deps
-# hadolint ignore=DL3008
-RUN <<-EOF
-	apt-get update
-	apt-get install -y --no-install-recommends \
-		file \
-		git
-	install-php-extensions \
-		@composer \
-		apcu \
-		intl \
-		opcache \
-		zip
-	rm -rf /var/lib/apt/lists/*
-EOF
+COPY composer.json composer.lock symfony.lock ./
 
-# https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
-ENV COMPOSER_ALLOW_SUPERUSER=1
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install \
+        --no-dev \
+        --no-interaction \
+        --prefer-dist \
+        --no-scripts \
+        --no-progress
+
+COPY src/ src/
+
+RUN composer dump-autoload --classmap-authoritative --no-dev
+
+# ─── Stage 2: FrankenPHP builder (Debian 13) ─────────────────────────────────
+FROM dunglas/frankenphp:1.12.4 AS builder
+
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+RUN install-php-extensions \
+    pdo_pgsql \
+    apcu \
+    intl \
+    opcache \
+    zip
+
+COPY frankenphp/conf.d/10-app.ini      $PHP_INI_DIR/app.conf.d/10-app.ini
+COPY frankenphp/conf.d/20-app.ini $PHP_INI_DIR/app.conf.d/20-app.ini
 
 ENV PHP_INI_SCAN_DIR=":$PHP_INI_DIR/app.conf.d"
 
-###> recipes ###
-###> doctrine/doctrine-bundle ###
-RUN install-php-extensions pdo_pgsql
-###< doctrine/doctrine-bundle ###
-###< recipes ###
+# Extraer librerías compartidas de frankenphp y cada extensión .so
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libtree \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /tmp/libs \
+    && for target in $(which frankenphp) \
+        $(find "$(php -r 'echo ini_get("extension_dir");')" -maxdepth 2 -name "*.so"); do \
+        libtree -pv "$target" 2>/dev/null \
+            | grep -oP '(?:── )\K/\S+(?= \[)' \
+            | while IFS= read -r lib; do \
+                [ -f "$lib" ] && cp -n "$lib" /tmp/libs/; \
+            done; \
+    done
 
-COPY --link frankenphp/conf.d/10-app.ini $PHP_INI_DIR/app.conf.d/
-COPY --link --chmod=755 frankenphp/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-COPY --link frankenphp/Caddyfile /etc/frankenphp/Caddyfile
+# Preparar directorios de Caddy con propiedad del usuario nonroot (UID 65532)
+RUN setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp \
+    && chown -R 65532:65532 /data /config
 
-ENTRYPOINT ["docker-entrypoint"]
-
-HEALTHCHECK --start-period=60s CMD php -r 'exit(false === @file_get_contents("http://localhost:2019/metrics", context: stream_context_create(["http" => ["timeout" => 5]])) ? 1 : 0);'
-CMD [ "frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile" ]
-
-# Dev FrankenPHP image
-FROM frankenphp_base AS frankenphp_dev
-
-ENV APP_ENV=dev
-ENV XDEBUG_MODE=off
-ENV FRANKENPHP_WORKER_CONFIG=watch
-
-# dev dependencies
-# hadolint ignore=DL3008
-RUN <<-EOF
-	mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-	apt-get update
-	apt-get install -y --no-install-recommends \
-		aggregate \
-		curl \
-		dnsmasq \
-		dnsutils \
-		iproute2 \
-		ipset \
-		iptables \
-		jq \
-		sudo
-	install-php-extensions xdebug
-	rm -rf /var/lib/apt/lists/*
-	useradd -m -s /bin/bash nonroot
-	echo "nonroot ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/nonroot
-	git config --system --add safe.directory /app
-EOF
-
-COPY --link frankenphp/conf.d/20-app.dev.ini $PHP_INI_DIR/app.conf.d/
-
-CMD [ "frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile", "--watch" ]
-
-# Builder for the prod FrankenPHP image
-FROM frankenphp_base AS frankenphp_prod_builder
-
-ENV APP_ENV=prod
-
-RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-
-COPY --link frankenphp/conf.d/20-app.prod.ini $PHP_INI_DIR/app.conf.d/
-
-# prevent the reinstallation of vendors at every changes in the source code
-COPY --link composer.* symfony.* ./
-RUN composer install --no-cache --prefer-dist --no-dev --no-autoloader --no-scripts --no-progress
-
-# copy sources
-COPY --link --exclude=frankenphp/ . ./
-
-RUN <<-EOF
-	mkdir -p var/cache var/log var/share
-	composer dump-autoload --classmap-authoritative --no-dev
-	composer dump-env prod
-	composer run-script --no-dev post-install-cmd
-	if [ -f importmap.php ]; then
-		php bin/console asset-map:compile
-	fi
-	chmod +x bin/console
-	chmod -R g=u var
-	sync
-EOF
-
-# Collect shared libraries needed by FrankenPHP and PHP extensions
-# hadolint ignore=DL3008,SC3054,DL4006
-RUN <<-'EOF'
-	apt-get update
-	apt-get install -y --no-install-recommends libtree
-	mkdir -p /tmp/libs
-	BINARIES=(frankenphp php file)
-	for target in $(printf '%s\n' "${BINARIES[@]}" | xargs -I{} which {}) \
-		$(find "$(php -r 'echo ini_get("extension_dir");')" -maxdepth 2 -name "*.so"); do
-		libtree -pv "$target" 2>/dev/null | grep -oP '(?:── )\K/\S+(?= \[)' | while IFS= read -r lib; do
-			[ -f "$lib" ] && cp -n "$lib" /tmp/libs/
-		done
-	done
-	rm -rf /var/lib/apt/lists/*
-EOF
-
-# Prod FrankenPHP image
-FROM debian:13-slim AS frankenphp_prod
-
-SHELL ["/bin/bash", "-euxo", "pipefail", "-c"]
-
-ENV APP_ENV=prod
-ENV PHP_INI_SCAN_DIR=":/usr/local/etc/php/app.conf.d"
-
-COPY --from=frankenphp_prod_builder /usr/local/bin/frankenphp /usr/local/bin/frankenphp
-COPY --from=frankenphp_prod_builder /usr/local/bin/php /usr/local/bin/php
-COPY --from=frankenphp_prod_builder /usr/local/bin/docker-php-entrypoint /usr/local/bin/docker-php-entrypoint
-COPY --from=frankenphp_prod_builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
-COPY --from=frankenphp_prod_builder /tmp/libs /usr/lib
-
-COPY --from=frankenphp_prod_builder /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
-COPY --from=frankenphp_prod_builder /usr/local/etc/php/php.ini /usr/local/etc/php/php.ini
-COPY --from=frankenphp_prod_builder /usr/local/etc/php/app.conf.d /usr/local/etc/php/app.conf.d
-
-COPY --from=frankenphp_prod_builder /etc/frankenphp/Caddyfile /etc/frankenphp/Caddyfile
-
-# CA certificates for TLS, file/libmagic for Symfony MIME type detection
-COPY --from=frankenphp_prod_builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=frankenphp_prod_builder /etc/ssl/openssl.cnf /etc/ssl/openssl.cnf
-COPY --from=frankenphp_prod_builder /usr/bin/file /usr/bin/file
-COPY --from=frankenphp_prod_builder /usr/lib/file/magic.mgc /usr/lib/file/magic.mgc
-
-ENV  OPENSSL_CONF=/etc/ssl/openssl.cnf XDG_CONFIG_HOME=/config XDG_DATA_HOME=/data
-
-RUN <<-EOF
-	mkdir -p /data/caddy /config/caddy
-	chown -R www-data:www-data /data /config
-	# Remove setuid/setgid bits
-	find / -perm /6000 -type f -exec chmod a-s {} + 2>/dev/null || true
-EOF
-
-COPY --link --exclude=var --from=frankenphp_prod_builder /app /app
-# Group 0 + g=u for arbitrary-UID runtimes (e.g. OpenShift).
-COPY --chown=www-data:0 --from=frankenphp_prod_builder /app/var /app/var
-RUN chmod g=u /app/var
-
-COPY --link --chmod=755 frankenphp/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-
-USER www-data
+# ─── Stage 3: Build de la app (warmup de caché) ───────────────────────────────
+FROM builder AS app_build
 
 WORKDIR /app
 
-ENTRYPOINT ["docker-entrypoint"]
+COPY --from=vendor /app/vendor vendor/
+COPY bin/        bin/
+COPY config/     config/
+COPY public/     public/
+COPY src/        src/
+COPY templates/  templates/
+COPY migrations/ migrations/
+COPY .env        ./
 
-HEALTHCHECK --start-period=60s CMD php -r 'exit(false === @file_get_contents("http://localhost:2019/metrics", context: stream_context_create(["http" => ["timeout" => 5]])) ? 1 : 0);'
-CMD [ "frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile" ]
+RUN mkdir -p var/cache var/log var/share config/jwt \
+    && APP_ENV=prod php bin/console cache:warmup \
+    && APP_ENV=prod php bin/console assets:install public \
+    && chown -R 65532:65532 var public config/jwt
+
+# ─── Stage 4: Imagen final distroless ────────────────────────────────────────
+FROM gcr.io/distroless/base-debian13 AS final
+
+# Binarios PHP (frankenphp para el servidor, php para el servicio migrate)
+COPY --from=builder /usr/local/bin/frankenphp /usr/local/bin/frankenphp
+COPY --from=builder /usr/local/bin/php        /usr/local/bin/php
+
+# Extensiones PHP y librerías compartidas
+COPY --from=builder /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=builder /tmp/libs                      /usr/lib
+
+# Configuración PHP (php.ini + conf.d + app.conf.d con nuestros INI)
+COPY --from=builder /usr/local/etc/php /usr/local/etc/php
+
+# Caddyfile y directorios de datos de Caddy (ya con UID 65532)
+COPY frankenphp/Caddyfile /etc/frankenphp/Caddyfile
+COPY --from=builder /data   /data
+COPY --from=builder /config /config
+
+WORKDIR /app
+
+COPY --link --chown=65532:65532 --from=vendor    /app/vendor vendor/
+COPY --link --chown=65532:65532 .env             ./
+COPY --link --chown=65532:65532 bin/             bin/
+COPY --link --chown=65532:65532 config/          config/
+COPY --link --chown=65532:65532 --from=app_build /app/config/jwt/ config/jwt/
+COPY --link --chown=65532:65532 templates/       templates/
+COPY --link --chown=65532:65532 src/             src/
+COPY --link --chown=65532:65532 migrations/      migrations/
+COPY --link --chown=65532:65532 --from=app_build /app/var/cache  var/cache
+COPY --link --chown=65532:65532 --from=app_build /app/var/log    var/log
+COPY --link --chown=65532:65532 --from=app_build /app/var/share  var/share
+COPY --link --chown=65532:65532 --from=app_build /app/public     public
+
+USER nonroot
+
+ENV APP_ENV=prod
+ENV FRANKENPHP_CONFIG="worker ./public/index.php"
+ENV PHP_INI_SCAN_DIR=":/usr/local/etc/php/app.conf.d"
+ENV XDG_CONFIG_HOME=/config
+ENV XDG_DATA_HOME=/data
+
+ENTRYPOINT ["/usr/local/bin/frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]

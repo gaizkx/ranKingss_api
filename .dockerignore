@@ -33,3 +33,7 @@ vendor/
 .env.local
 .env.local.php
 .env.test
+config/jwt/
+rector.php
+phpstan.dist.neon
+phpunit.dist.xml
