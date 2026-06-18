@@ -13,10 +13,6 @@ API REST anónima para la valoración de empleados, construida con Symfony y API
 | Autenticación | JWT (`lexik/jwt-authentication-bundle`) |
 | Entorno local | ddev |
 
-## Documentación
-
-- [Despliegue con Docker (producción)](docs/deploy.md)
-
 ## Filosofía de diseño
 
 Los usuarios se registran con un número de cuenta de 12 dígitos (proporcionado por el cliente) y una contraseña. No se almacena ningún dato personal.
@@ -48,51 +44,48 @@ ddev console doctrine:migrations:migrate
 ddev console doctrine:fixtures:load
 ```
 
-La API estará disponible en `https://rankingss.ddev.site/api`.  
+La API estará disponible en la raíz `https://rankingss.ddev.site/` (los recursos
+cuelgan directamente, p.ej. `/employees`, `/rankings`; no hay prefijo `/api`).  
 La documentación interactiva (Swagger UI) en `https://rankingss.ddev.site/docs`.
 
 ---
 
-## Variables de entorno
+## Despliegue (imagen Docker de producción)
 
-No es necesario crear `.env.local`. El entorno ddev inyecta automáticamente las variables. Si necesitas personalizar algo, copia `.env` en `.env.local` y ajusta:
+La imagen (`Dockerfile` → `compose.yaml`) es distroless y corre con `APP_ENV=prod`.
+La Swagger UI está **deshabilitada en producción** por diseño (regla de negocio); los
+endpoints REST siguen disponibles bajo las rutas documentadas más abajo.
 
-```dotenv
-DATABASE_URL="postgresql://db:db@db:5432/db?serverVersion=18&charset=utf8"
-JWT_SECRET_KEY=%kernel.project_dir%/config/jwt/private.pem
-JWT_PUBLIC_KEY=%kernel.project_dir%/config/jwt/public.pem
-JWT_PASSPHRASE=change_me
+**Secretos requeridos** (la imagen no los hornea; `docker compose` falla si faltan):
+
+```bash
+# Secreto de aplicación de Symfony
+export APP_SECRET="$(openssl rand -hex 16)"
+
+# Passphrase del par de claves JWT
+export JWT_PASSPHRASE="<la-passphrase-de-tus-claves>"
+```
+
+**Claves JWT**: se montan en runtime vía el volumen `./config/jwt` (read-only), no
+viven dentro de la imagen. Genera el par una sola vez y persístelo en el entorno de
+despliegue:
+
+```bash
+ddev console lexik:jwt:generate-keypair    # o: php bin/console ... en el host
+```
+
+```bash
+docker compose build app
+docker compose up -d
 ```
 
 ---
 
-## Comandos del proyecto
+## Comandos `app:`
 
 ```bash
-# Consola de Symfony (alias para ddev exec bin/console)
-ddev console <command>
-
-# Tests
-ddev test
-
-# Rector (PHP CS)
-ddev rector
-
-# Crear un empleado
+# Crear un empleado (única forma de añadir empleados)
 ddev console app:employee:create "Nombre Apellido"
-
-# Generar/regenerar claves JWT
-ddev console lexik:jwt:generate-keypair --overwrite
-
-# Crear y ejecutar migraciones
-ddev console doctrine:migrations:diff
-ddev console doctrine:migrations:migrate
-
-# Abrir consola PostgreSQL
-ddev psql
-
-# Ver logs del servidor
-ddev logs
 ```
 
 ---
@@ -120,63 +113,6 @@ Con filtro:
 ```bash
 ddev test --filter=RegisterTest
 ddev test --filter=testRegisterCreatesUserAndCanLogin
-```
-
----
-
-## Estructura del proyecto
-
-```
-src/
-├── ApiResource/
-│   ├── EmployeeListItem.php          # DTO para GET /employees
-│   ├── EmployeeStats.php             # Recurso virtual (sin entidad DB)
-│   ├── Ping.php                      # Recurso para GET /ping
-│   └── Register.php                  # DTO para POST /register
-├── Command/
-│   └── CreateEmployeeCommand.php     # app:employee:create
-├── DataFixtures/
-│   └── AppFixtures.php
-├── DataTransferObject/
-│   └── HeatmapEntry.php              # {date, avgScore, rankingCount}
-├── Doctrine/
-│   └── RankingUserExtension.php      # Filtra rankings por usuario autenticado
-├── Entity/
-│   ├── Employee.php
-│   ├── Ranking.php
-│   ├── UlidIdTrait.php
-│   └── User.php
-├── Repository/
-│   ├── EmployeeRepository.php
-│   ├── RankingRepository.php         # Consultas de estadísticas y filtros
-│   └── UserRepository.php
-├── Security/
-│   └── OptionalJWTAuthenticator.php  # Permite JWT opcional en /ping
-├── State/
-│   ├── PingProvider.php
-│   ├── RegisterProcessor.php         # Crea usuario + hashea contraseña
-│   ├── Processor/
-│   │   └── RankingCreateProcessor.php # Valida límite diario + asigna usuario
-│   └── Provider/
-│       ├── EmployeeCollectionProvider.php  # Lista empleados con stats
-│       └── EmployeeStatsProvider.php       # Calcula estadísticas en tiempo real
-└── Validator/
-    ├── RankingDateRange.php
-    └── RankingDateRangeValidator.php
-tests/
-├── Command/
-│   └── CreateEmployeeCommandTest.php
-├── Repository/
-│   ├── EmployeeRepositoryTest.php
-│   ├── RankingRepositoryTest.php
-│   ├── RepositoryTestCase.php        # Trait con helpers para tests
-│   └── UserRepositoryTest.php
-├── EmployeeStatsTest.php
-├── EmployeeTest.php
-├── PingTest.php
-├── RankingTest.php
-├── RegisterTest.php
-└── bootstrap.php
 ```
 
 ---
@@ -363,15 +299,3 @@ tests/
 }
 ```
 
----
-
-## Reglas de negocio
-
-1. **Anonimato total**: el número de cuenta de 12 dígitos se proporciona en el registro. No hay mecanismo de recuperación de cuenta ni de contraseña.
-2. **Sin datos personales**: la API no almacena nombre, email ni ningún dato identificativo del usuario.
-3. **Límite diario de rankings**: máximo **5 rankings por usuario por día natural**. El mismo empleado puede valorarse más de una vez dentro de ese límite.
-4. **Rankings inmutables**: una vez creado, un ranking no puede ser modificado ni eliminado.
-5. **Visibilidad restringida**: un usuario solo puede consultar **sus propios rankings** (filtrado automático por el usuario autenticado).
-6. **Gestión de empleados offline**: los empleados solo pueden crearse mediante el comando de consola `app:employee:create`. No existe endpoint de escritura para empleados.
-7. **Rango de fechas máximo**: la diferencia entre `startDate` y `endDate` no puede superar los **3 meses** (92 días).
-8. **Estadísticas computadas**: las estadísticas de empleado no se persisten en base de datos; se calculan mediante consultas DQL en cada petición.
