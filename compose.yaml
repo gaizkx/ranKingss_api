@@ -17,8 +17,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-15}&charset=${POSTGRES_CHARSET:-utf8}
       CORS_ALLOW_ORIGIN: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$'
       # Secretos obligatorios en producción (compose falla si no están definidos).
-      APP_SECRET: ${APP_SECRET:?Define APP_SECRET, p.ej. openssl rand -hex 16}
+      APP_SECRET: ${APP_SECRET:?Define APP_SECRET, p.ej. openssl rand -hex 32}
       JWT_PASSPHRASE: ${JWT_PASSPHRASE:?Define JWT_PASSPHRASE (la del par de claves JWT)}
+      API_KEY: ${API_KEY:?Define API_KEY, p.ej. openssl rand -hex 32}
     depends_on:
       database:
         condition: service_healthy
