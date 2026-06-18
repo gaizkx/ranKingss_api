@@ -8,13 +8,17 @@ services:
         published: ${HTTP_PORT:-4321}
         protocol: tcp
     volumes:
+      # Las claves JWT NO se hornean en la imagen: se inyectan en runtime.
+      # Genera el par una vez con: ddev console lexik:jwt:generate-keypair
       - ./config/jwt:/app/config/jwt:ro
     environment:
       SERVER_NAME: ":80"
       DEFAULT_URI: https://${SERVER_NAME:-localhost}:${HTTPS_PORT:-443}
       DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-!ChangeMe!}@database:5432/${POSTGRES_DB:-app}?serverVersion=${POSTGRES_VERSION:-15}&charset=${POSTGRES_CHARSET:-utf8}
       CORS_ALLOW_ORIGIN: '^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$$'
-      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # Secretos obligatorios en producción (compose falla si no están definidos).
+      APP_SECRET: ${APP_SECRET:?Define APP_SECRET, p.ej. openssl rand -hex 16}
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE:?Define JWT_PASSPHRASE (la del par de claves JWT)}
     depends_on:
       database:
         condition: service_healthy

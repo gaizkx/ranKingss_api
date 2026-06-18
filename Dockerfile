@@ -60,6 +60,7 @@ FROM builder AS app_build
 WORKDIR /app
 
 COPY --from=vendor /app/vendor vendor/
+COPY composer.json composer.lock symfony.lock ./
 COPY bin/        bin/
 COPY config/     config/
 COPY public/     public/
@@ -95,6 +96,7 @@ COPY --from=builder /config /config
 WORKDIR /app
 
 COPY --link --chown=65532:65532 --from=vendor    /app/vendor vendor/
+COPY --link --chown=65532:65532 composer.json composer.lock symfony.lock ./
 COPY --link --chown=65532:65532 .env             ./
 COPY --link --chown=65532:65532 bin/             bin/
 COPY --link --chown=65532:65532 config/          config/
