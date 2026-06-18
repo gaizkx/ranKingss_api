@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Tests;
 
 use App\Entity\Ranking;
-use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Tests\ApiKeyAwareTestCase;
 use ApiPlatform\Symfony\Bundle\Test\Client;
 use App\Entity\Employee;
 use App\Entity\User;
 
-class RankingTest extends ApiTestCase
+class RankingTest extends ApiKeyAwareTestCase
 {
     protected static ?bool $alwaysBootKernel = false;
 

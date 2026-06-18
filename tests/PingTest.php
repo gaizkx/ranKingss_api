@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Tests;
 
-use ApiPlatform\Symfony\Bundle\Test\ApiTestCase;
+use App\Tests\ApiKeyAwareTestCase;
 use App\Entity\User;
 
-class PingTest extends ApiTestCase
+class PingTest extends ApiKeyAwareTestCase
 {
     protected static ?bool $alwaysBootKernel = false;
 
